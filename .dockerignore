@@ -1,0 +1,8 @@
+.git
+.gitignore
+__pycache__
+**/__pycache__
+*.pyc
+okf_output
+rag_cache
+.env

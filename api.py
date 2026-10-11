@@ -30,6 +30,7 @@ try:
     )
     from .retriever import advanced_search, doc_to_dict
     from .intent import should_use_rag
+    from .llm import LLMConfigError, LLMRefusalError, generate_answer
 except ImportError:
     from vector_store import (
         delete_documents_by_source,
@@ -38,6 +39,7 @@ except ImportError:
     )
     from retriever import advanced_search, doc_to_dict
     from intent import should_use_rag
+    from llm import LLMConfigError, LLMRefusalError, generate_answer
 
 logger = logging.getLogger("rag_api")
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +60,10 @@ if HAS_FASTAPI:
         query: str = Field(..., description="User search query")
         top_k: int = Field(5, ge=1, le=100, description="Number of context results to return")
         hybrid: bool = Field(True, description="Enable hybrid semantic + BM25 search & MMR diversity")
+
+    class AnswerRequest(BaseModel):
+        query: str = Field(..., description="User question")
+        top_k: int = Field(5, ge=1, le=50, description="Number of context passages sent to the LLM")
 
     @app.get("/api/v1/health")
     def health():
@@ -100,6 +106,27 @@ if HAS_FASTAPI:
             return {"use_rag": True, "count": len(results), "results": results}
         except Exception as exc:
             logger.error("[API] Query failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/answer")
+    def answer_rag(payload: AnswerRequest):
+        try:
+            docs = [doc_to_dict(d) for d in advanced_search(payload.query, top_k=payload.top_k)]
+            answer = generate_answer(payload.query, docs)
+            return {
+                "answer": answer.text,
+                "provider": answer.provider,
+                "model": answer.model,
+                "count": len(docs),
+                "sources": docs,
+            }
+        except LLMConfigError as exc:
+            logger.error("[API] LLM misconfigured: %s", exc)
+            raise HTTPException(status_code=503, detail=str(exc))
+        except LLMRefusalError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except Exception as exc:
+            logger.error("[API] Answer failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
 else:

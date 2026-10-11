@@ -19,5 +19,7 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
 pydantic>=2.6.0
 
-# Text Generation & LLM (Optional)
-google-generativeai>=0.4.0
+# Text Generation & LLM Providers
+anthropic>=1.0.0
+openai>=1.40.0
+google-genai>=1.0.0

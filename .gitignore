@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.env
+okf_output/
+rag_cache/
+Data/*
+!Data/.gitkeep
+.venv/
+venv/
+.DS_Store

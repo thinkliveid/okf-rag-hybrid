@@ -72,11 +72,16 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 PGVECTOR_TABLE = os.getenv("RAG_PGVECTOR_TABLE", "rag_chunks")
 PGVECTOR_DIM = int(os.getenv("RAG_PGVECTOR_DIM", str(EMBEDDING_DIM)))
 
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
+LLM_MODEL: str = os.getenv("LLM_MODEL", "").strip()
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "16000"))
+OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434/v1").strip()
+
 
 def print_config_summary() -> None:
     print("-- RAG config ------------------------")
     print(f"  Embedding model:  {LOCAL_EMBEDDING_MODEL}  ({EMBEDDING_DIM}-dim, local all-MiniLM-L6-v2)")
-    print(f"  Text generation:  Gemini (key from GEMINI_API_KEY)")
+    print(f"  Text generation:  {LLM_PROVIDER} ({LLM_MODEL or 'default model'})")
     print(f"  Raw dir:          {RAW_DIR}")
     print(f"  OKF dir:          {OKF_DIR}")
     print(f"  pgvector table:   {PGVECTOR_TABLE}  (dim={PGVECTOR_DIM})")
