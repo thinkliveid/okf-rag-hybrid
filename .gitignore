@@ -8,3 +8,4 @@ Data/*
 .venv/
 venv/
 .DS_Store
+knowledge/

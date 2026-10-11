@@ -77,6 +77,10 @@ LLM_MODEL: str = os.getenv("LLM_MODEL", "").strip()
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "16000"))
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434/v1").strip()
 
+_knowledge_env = os.getenv("RAG_KNOWLEDGE_DIR", "knowledge")
+KNOWLEDGE_DIR = Path(_knowledge_env) if Path(_knowledge_env).is_absolute() else ROOT / _knowledge_env
+MAX_CONCEPTS = int(os.getenv("RAG_MAX_CONCEPTS", "3"))
+
 
 def print_config_summary() -> None:
     print("-- RAG config ------------------------")
