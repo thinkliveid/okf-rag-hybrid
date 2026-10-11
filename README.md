@@ -185,9 +185,3 @@ Adapt the engine for any specific domain (Healthcare, Legal, E-Commerce, Tech) w
 Contributions are welcome! Feel free to submit a Pull Request or open an Issue for feature requests or bug fixes.
 
 ---
-
-## Created By
-
- HANZALA KNOX
-
----
