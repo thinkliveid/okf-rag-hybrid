@@ -115,6 +115,16 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 
 Access the interactive API documentation at: `http://localhost:8000/docs`
 
+### 4. Web UI
+
+A simple static web UI lives in `ui/` (plain HTML/CSS/JS served by nginx, which proxies `/api` to the API service). It covers asking questions (`/answer`), hybrid search (`/query`), and upserting or deleting documents.
+
+```bash
+docker compose up -d --build
+```
+
+Open `http://localhost:3005` (override with `UI_PORT`). To point the UI at an API running elsewhere, set `API_UPSTREAM` on the `ui` container, e.g. `http://host.docker.internal:8000`.
+
 ---
 
 ## 📡 REST API Reference

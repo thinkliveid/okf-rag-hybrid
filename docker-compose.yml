@@ -49,6 +49,16 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  ui:
+    build: ./ui
+    image: okf-rag-hybrid-ui:latest
+    ports:
+      - "${UI_PORT:-3005}:80"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
   ingest:
     image: okf-rag-hybrid:latest
     profiles: ["ingest"]

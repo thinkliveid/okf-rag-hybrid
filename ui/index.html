@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OKF RAG</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>OKF RAG</h1>
+    <span id="health" class="health health--unknown">Mengecek API…</span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab is-active" data-tab="answer" role="tab">Tanya</button>
+    <button class="tab" data-tab="search" role="tab">Cari</button>
+    <button class="tab" data-tab="documents" role="tab">Dokumen</button>
+  </nav>
+
+  <main>
+    <section id="panel-answer" class="panel is-active">
+      <form id="answer-form" class="stack">
+        <textarea id="answer-query" rows="3" placeholder="Tulis pertanyaan…" required></textarea>
+        <div class="row">
+          <label>Top K <input id="answer-topk" type="number" min="1" max="50" value="5"></label>
+          <button type="submit">Tanya</button>
+        </div>
+      </form>
+      <div id="answer-output" class="output"></div>
+    </section>
+
+    <section id="panel-search" class="panel">
+      <form id="search-form" class="stack">
+        <input id="search-query" type="text" placeholder="Kata kunci pencarian…" required>
+        <div class="row">
+          <label>Top K <input id="search-topk" type="number" min="1" max="100" value="5"></label>
+          <label class="check"><input id="search-hybrid" type="checkbox" checked> Hybrid</label>
+          <button type="submit">Cari</button>
+        </div>
+      </form>
+      <div id="search-output" class="output"></div>
+    </section>
+
+    <section id="panel-documents" class="panel">
+      <h2>Upsert dokumen</h2>
+      <form id="upsert-form" class="stack">
+        <input id="upsert-source" type="text" placeholder="Source ID, mis. docs/panduan.md" required>
+        <input id="upsert-file" type="file" accept=".txt,.md,.markdown,.csv,.json">
+        <textarea id="upsert-text" rows="10" placeholder="Tempel teks dokumen, atau pilih file di atas…" required></textarea>
+        <div class="row">
+          <button type="submit">Simpan</button>
+        </div>
+      </form>
+      <div id="upsert-output" class="output"></div>
+
+      <h2>Hapus dokumen</h2>
+      <form id="delete-form" class="stack">
+        <input id="delete-source" type="text" placeholder="Source ID" required>
+        <div class="row">
+          <button type="submit" class="danger">Hapus</button>
+        </div>
+      </form>
+      <div id="delete-output" class="output"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
