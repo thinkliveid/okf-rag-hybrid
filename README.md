@@ -44,6 +44,8 @@ Unlike basic RAG tutorials that suffer from context loss, fixed sentence slicing
  └────────────────┘     └───────────────────────┘     └──────────────────────┘     └──────────────────────┘
 ```
 
+For a walkthrough of how the current code actually flows (ingest, upsert, hybrid search, LLM answer, caching), see [docs/flow.md](docs/flow.md) (in Indonesian).
+
 ---
 
 ## 📁 Repository Structure
