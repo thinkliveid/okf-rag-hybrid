@@ -85,6 +85,12 @@ def _quote_ident(identifier: str) -> str:
 
 TABLE = _quote_ident(PGVECTOR_TABLE)
 
+SEARCH_VECTOR_EXPR = (
+    "setweight(to_tsvector('simple', coalesce(metadata->'okf_frontmatter'->>'title', '')), 'A') || "
+    "setweight(to_tsvector('simple', coalesce(metadata->'okf_frontmatter'->>'tags', '')), 'B') || "
+    "setweight(to_tsvector('simple', coalesce(document, '')), 'D')"
+)
+
 
 def _vector_literal(values: Iterable[float]) -> str:
     return "[" + ",".join(f"{float(value):.8f}" for value in values) + "]"
@@ -115,13 +121,12 @@ def ensure_schema(dimension: int | None = None) -> None:
                 document TEXT NOT NULL,
                 metadata JSONB NOT NULL DEFAULT '{{}}'::jsonb,
                 embedding vector({int(dim)}) NOT NULL,
-                search_vector tsvector GENERATED ALWAYS AS (
-                    to_tsvector('simple', coalesce(document, ''))
-                ) STORED,
+                search_vector tsvector GENERATED ALWAYS AS ({SEARCH_VECTOR_EXPR}) STORED,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
             """
         )
+        _migrate_search_vector(cur)
         cur.execute(
             f"CREATE INDEX IF NOT EXISTS {PGVECTOR_TABLE}_search_idx "
             f"ON {TABLE} USING GIN (search_vector)"
@@ -131,6 +136,27 @@ def ensure_schema(dimension: int | None = None) -> None:
             f"ON {TABLE} USING hnsw (embedding vector_cosine_ops)"
         )
         cur.close()
+
+
+def _migrate_search_vector(cur) -> None:
+    cur.execute(
+        """
+        SELECT pg_get_expr(d.adbin, d.adrelid)
+        FROM pg_attribute a
+        LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+        WHERE a.attrelid = %s::regclass AND a.attname = 'search_vector' AND NOT a.attisdropped
+        """,
+        (TABLE,),
+    )
+    row = cur.fetchone()
+    if row and row[0] and "setweight" in row[0]:
+        return
+    logger.info("[STORE] Rebuilding %s.search_vector with weighted OKF title/tags", PGVECTOR_TABLE)
+    cur.execute(f"ALTER TABLE {TABLE} DROP COLUMN IF EXISTS search_vector")
+    cur.execute(
+        f"ALTER TABLE {TABLE} ADD COLUMN search_vector tsvector "
+        f"GENERATED ALWAYS AS ({SEARCH_VECTOR_EXPR}) STORED"
+    )
 
 
 def _existing_dimension() -> int | None:
@@ -212,7 +238,7 @@ def _search(query: str, query_embedding: list[float], top_k: int, trim: bool) ->
     ensure_schema(len(query_embedding))
     vector = _vector_literal(query_embedding)
     # Sanitize query for full-text search: keep ASCII alphanumeric only (handles Roman Urdu)
-    ts_query = " ".join(w for w in re.findall(r"[a-zA-Z0-9]+", query.lower()) if len(w) > 1)
+    ts_query = " | ".join(w for w in re.findall(r"[a-zA-Z0-9]+", query.lower()) if len(w) > 1)
 
     # Larger candidate pool → better BM25 reranking coverage
     candidate_pool = max(top_k * 20, 60)
@@ -228,8 +254,8 @@ def _search(query: str, query_embedding: list[float], top_k: int, trim: bool) ->
                     metadata,
                     embedding <=> %s::vector AS distance,
                     CASE
-                        WHEN plainto_tsquery('simple', %s)::text = '' THEN 0
-                        ELSE ts_rank_cd(search_vector, plainto_tsquery('simple', %s), 32)
+                        WHEN to_tsquery('simple', %s)::text = '' THEN 0
+                        ELSE ts_rank_cd(search_vector, to_tsquery('simple', %s), 32)
                     END AS bm25_score
                 FROM {TABLE}
                 ORDER BY embedding <=> %s::vector
