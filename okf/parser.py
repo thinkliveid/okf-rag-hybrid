@@ -63,6 +63,14 @@ def _split_by_headings(text: str, headings: list[str]) -> list[tuple[str, str]]:
     return [b for b in blocks if b[1]]
 
 
+def _document_title(text: str, path: Path) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# ") and stripped[2:].strip():
+            return stripped[2:].strip()[:120]
+    return path.stem.replace("_", " ").replace("-", " ").title()
+
+
 def parse(files: list[FileInfo]) -> list[ParsedDocument]:
     parsed_docs = []
     for file_info in files:
@@ -102,7 +110,7 @@ def parse_file(file_info: FileInfo) -> list[ParsedDocument]:
     elif filename in _SPLIT_HEADINGS:
         segments = _split_by_headings(text, _SPLIT_HEADINGS[filename])
     else:
-        segments = [(file_info.path.stem.replace("_", " ").replace("-", " ").title(), text)]
+        segments = [(_document_title(text, path), text)]
 
     docs = []
     seen_titles = {}

@@ -1,6 +1,7 @@
 x-app-env: &app-env
   DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-rag_db}
-  LOCAL_EMBEDDING_MODEL: ${LOCAL_EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+  LOCAL_EMBEDDING_MODEL: ${LOCAL_EMBEDDING_MODEL:-BAAI/bge-m3}
+  EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
   LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
   LLM_MODEL: ${LLM_MODEL:-}
   LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-16000}
@@ -31,7 +32,7 @@ services:
     build:
       context: .
       args:
-        LOCAL_EMBEDDING_MODEL: ${LOCAL_EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+        LOCAL_EMBEDDING_MODEL: ${LOCAL_EMBEDDING_MODEL:-BAAI/bge-m3}
     image: okf-rag-hybrid:latest
     environment: *app-env
     ports:
@@ -47,6 +48,16 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    restart: unless-stopped
+
+  ui:
+    build: ./ui
+    image: okf-rag-hybrid-ui:latest
+    ports:
+      - "${UI_PORT:-3005}:80"
+    depends_on:
+      api:
+        condition: service_started
     restart: unless-stopped
 
   ingest:
