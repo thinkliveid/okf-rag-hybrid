@@ -43,8 +43,8 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 OKF_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Embedding (all-MiniLM-L6-v2 only,  384-dimensional) ─────────────────────────────────
-LOCAL_EMBEDDING_MODEL: str = os.getenv("LOCAL_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-EMBEDDING_DIM: int = 384
+LOCAL_EMBEDDING_MODEL: str = os.getenv("LOCAL_EMBEDDING_MODEL", "BAAI/bge-m3")
+EMBEDDING_DIM: int = int(os.getenv("EMBEDDING_DIM", "1024"))
 
 # ── Retrieval settings ────────────────────────────────────────────────────────
 TOP_K = int(os.getenv("RAG_TOP_K", "5"))
@@ -80,7 +80,7 @@ OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal
 
 def print_config_summary() -> None:
     print("-- RAG config ------------------------")
-    print(f"  Embedding model:  {LOCAL_EMBEDDING_MODEL}  ({EMBEDDING_DIM}-dim, local all-MiniLM-L6-v2)")
+    print(f"  Embedding model:  {LOCAL_EMBEDDING_MODEL}  ({EMBEDDING_DIM}-dim)")
     print(f"  Text generation:  {LLM_PROVIDER} ({LLM_MODEL or 'default model'})")
     print(f"  Raw dir:          {RAW_DIR}")
     print(f"  OKF dir:          {OKF_DIR}")

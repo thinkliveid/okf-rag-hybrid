@@ -14,18 +14,20 @@ import logging
 import json
 import threading
 import os
+import re
 from collections import OrderedDict
 from pathlib import Path
 
 try:
-    from .config import EMBED_CACHE_SIZE, SEMANTIC_CACHE_SIZE, CACHE_DIR, EMBEDDING_DIM
+    from .config import EMBED_CACHE_SIZE, SEMANTIC_CACHE_SIZE, CACHE_DIR, EMBEDDING_DIM, LOCAL_EMBEDDING_MODEL
 except ImportError:
-    from config import EMBED_CACHE_SIZE, SEMANTIC_CACHE_SIZE, CACHE_DIR, EMBEDDING_DIM
+    from config import EMBED_CACHE_SIZE, SEMANTIC_CACHE_SIZE, CACHE_DIR, EMBEDDING_DIM, LOCAL_EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
 
-EMBED_CACHE_FILE = CACHE_DIR / "embed_cache.json"
-SEMANTIC_CACHE_FILE = CACHE_DIR / "semantic_cache.json"
+MODEL_CACHE_SUFFIX = re.sub(r"[^a-z0-9]+", "-", LOCAL_EMBEDDING_MODEL.lower()).strip("-")
+EMBED_CACHE_FILE = CACHE_DIR / f"embed_cache.{MODEL_CACHE_SUFFIX}.json"
+SEMANTIC_CACHE_FILE = CACHE_DIR / f"semantic_cache.{MODEL_CACHE_SUFFIX}.json"
 CACHE_VERSION = 5  # bumped: invalidates old dimension-mismatched entries
 
 _disk_write_lock = threading.Lock()
