@@ -1,0 +1,13 @@
+{
+  "domain_name": "General RAG Engine",
+  "routing": {
+    "always_use_rag": true,
+    "intent_keywords": []
+  },
+  "synonyms": {},
+  "chunking": {
+    "min_chars": 150,
+    "max_chars": 1000,
+    "overlap": 0
+  }
+}
