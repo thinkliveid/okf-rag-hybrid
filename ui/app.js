@@ -49,6 +49,23 @@ function renderResults(container, results) {
   });
 }
 
+const TIER_LABELS = { human: "human-reviewed", machine: "machine", unverified: "unverified" };
+
+function renderConcepts(container, concepts) {
+  if (!concepts.length) return;
+  container.append(element("p", { class: "meta", text: "Konsep terkurasi" }));
+  concepts.forEach((concept, index) => {
+    const tier = concept.verified_tier ?? "unverified";
+    container.append(
+      element("div", { class: "concept" }, [
+        element("span", { text: `K${index + 1}. ${concept.title}` }),
+        element("span", { class: "concept__path", text: concept.path }),
+        element("span", { class: `badge badge--${tier}`, text: TIER_LABELS[tier] ?? tier }),
+      ]),
+    );
+  });
+}
+
 async function withBusy(form, task) {
   const button = form.querySelector("button[type=submit]");
   button.disabled = true;
@@ -98,6 +115,7 @@ function setupAnswer() {
           element("div", { class: "answer", text: body.answer }),
           element("p", { class: "meta", text: `${body.provider} · ${body.model} · ${body.count} sumber` }),
         );
+        renderConcepts(output, body.concepts ?? []);
         renderResults(output, body.sources ?? []);
       } catch (error) {
         notice(output, error.message, "error");
