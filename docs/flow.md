@@ -84,9 +84,14 @@ Kalau `hybrid=false`, langkah 1, 3, dan 4 dilewati; hanya `search_documents` yan
 ## Flow 4: Answer (`POST /api/v1/answer`)
 
 ```
+knowledge.load_concepts(RAG_KNOWLEDGE_DIR) → konsep OKF terkurasi berstatus active
+  │ kalau ada konsep dan use_knowledge=true:
+  │   llm.select_concepts → LLM menerima listing (path | title | description) dan membalas JSON path
+  │   gagal atau balasan tidak valid → lanjut tanpa konsep, router.error diisi
+  ▼
 advanced_search(query) → docs
   ▼
-llm.build_user_message  → <context>[1] (source: ...) ...</context> + Question
+llm.build_user_message  → <concepts>[K1] ...</concepts> (kalau ada) + <context>[1] (source: ...) ...</context> + Question
   ▼
 llm.generate_answer     → dispatch berdasarkan LLM_PROVIDER
                           (anthropic default, openai, gemini, ollama)
@@ -94,6 +99,8 @@ llm.generate_answer     → dispatch berdasarkan LLM_PROVIDER
   ▼
 {answer, provider, model, count, sources}
 ```
+
+Response juga berisi `concepts` (konsep yang dikirim ke LLM) dan `router` (`enabled`, `selected`, `error`). Bundle konsep, format frontmatter, dan CLI-nya (`python knowledge.py index|check`) dijelaskan di [`SPEC.md`](../SPEC.md) §2.
 
 Mapping error: konfigurasi LLM salah menghasilkan 503, model menolak (refusal) menghasilkan 422, error lain menghasilkan 500.
 

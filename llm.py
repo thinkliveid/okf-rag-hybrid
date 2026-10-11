@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import json
 import logging
+import re
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Iterable, Sequence
 
 try:
     from .config import LLM_MAX_TOKENS, LLM_MODEL, LLM_PROVIDER, OLLAMA_BASE_URL
+    from .knowledge import Concept, render_listing
 except ImportError:
     from config import LLM_MAX_TOKENS, LLM_MODEL, LLM_PROVIDER, OLLAMA_BASE_URL
+    from knowledge import Concept, render_listing
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +28,18 @@ SYSTEM_PROMPT = (
     "Cite the passages you rely on with their numbers, like [1] or [2]. "
     "If the context does not contain the answer, say that you could not find it in the documents "
     "instead of guessing. Reply in the same language as the question."
+)
+
+KNOWLEDGE_SYSTEM_PROMPT = SYSTEM_PROMPT + (
+    " Some passages are curated knowledge concepts numbered [K1], [K2]; cite them the same way. "
+    "Prefer a concept over a numbered passage when they disagree."
+)
+
+SELECT_SYSTEM_PROMPT = (
+    "You route questions to a curated knowledge base. You receive an index of concepts, one per line as "
+    "'- <path> | <title> | <description>', followed by a question. Pick the concepts whose content is needed "
+    "to answer the question, most relevant first, at most {max_concepts}. Reply with JSON only, no prose: "
+    '{{"concepts": ["<path>", ...]}}. Reply {{"concepts": []}} when no concept applies.'
 )
 
 
@@ -51,8 +67,38 @@ def build_context(docs: list[dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
-def build_user_message(question: str, docs: list[dict[str, Any]]) -> str:
-    return f"<context>\n{build_context(docs)}\n</context>\n\nQuestion: {question}"
+def build_concept_context(concepts: Sequence[Concept]) -> str:
+    return "\n\n".join(
+        f"[K{i}] (concept: {c.path}, verified: {c.verified_tier})\n# {c.title}\n\n{c.body}"
+        for i, c in enumerate(concepts, 1)
+    )
+
+
+def build_user_message(question: str, docs: list[dict[str, Any]], concepts: Sequence[Concept] = ()) -> str:
+    message = f"<context>\n{build_context(docs)}\n</context>\n\nQuestion: {question}"
+    if not concepts:
+        return message
+    return f"<concepts>\n{build_concept_context(concepts)}\n</concepts>\n\n{message}"
+
+
+def parse_selection(text: str, known_paths: Iterable[str], max_concepts: int) -> list[str]:
+    candidates = [text.strip()] + re.findall(r"\{.*\}", text, re.S)
+    for candidate in candidates:
+        try:
+            data = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and isinstance(data.get("concepts"), list):
+            break
+    else:
+        raise ValueError(f"Selection reply is not a JSON object with a 'concepts' list: {text[:200]!r}")
+
+    known = set(known_paths)
+    selected: list[str] = []
+    for path in data["concepts"]:
+        if isinstance(path, str) and path in known and path not in selected:
+            selected.append(path)
+    return selected[:max_concepts]
 
 
 def _require_model(provider: str) -> str:
@@ -161,12 +207,26 @@ PROVIDERS: dict[str, Callable[[str, str], LLMAnswer]] = {
 }
 
 
-def generate_answer(question: str, docs: list[dict[str, Any]]) -> LLMAnswer:
+def complete(system: str, user: str) -> LLMAnswer:
     generate = PROVIDERS.get(LLM_PROVIDER)
     if generate is None:
         raise LLMConfigError(
             f"Unknown LLM_PROVIDER={LLM_PROVIDER!r}. Choose one of: {', '.join(sorted(PROVIDERS))}"
         )
-    answer = generate(SYSTEM_PROMPT, build_user_message(question, docs))
+    return generate(system, user)
+
+
+def select_concepts(question: str, concepts: Sequence[Concept], max_concepts: int) -> list[Concept]:
+    by_path = {c.path: c for c in concepts}
+    user = f"<index>\n{render_listing(list(concepts))}\n</index>\n\nQuestion: {question}"
+    reply = complete(SELECT_SYSTEM_PROMPT.format(max_concepts=max_concepts), user)
+    paths = parse_selection(reply.text, by_path, max_concepts)
+    logger.info("[ROUTER] Selected %d/%d concepts: %s", len(paths), len(concepts), paths)
+    return [by_path[p] for p in paths]
+
+
+def generate_answer(question: str, docs: list[dict[str, Any]], concepts: Sequence[Concept] = ()) -> LLMAnswer:
+    system = KNOWLEDGE_SYSTEM_PROMPT if concepts else SYSTEM_PROMPT
+    answer = complete(system, build_user_message(question, docs, concepts))
     logger.info("[LLM] %s/%s answered with %d chars", answer.provider, answer.model, len(answer.text))
     return answer

@@ -30,7 +30,9 @@ try:
     )
     from .retriever import advanced_search, doc_to_dict
     from .intent import should_use_rag
-    from .llm import LLMConfigError, LLMRefusalError, generate_answer
+    from .llm import LLMConfigError, LLMRefusalError, generate_answer, select_concepts
+    from .knowledge import Concept, load_concepts
+    from .config import KNOWLEDGE_DIR, MAX_CONCEPTS
 except ImportError:
     from vector_store import (
         delete_documents_by_source,
@@ -39,7 +41,9 @@ except ImportError:
     )
     from retriever import advanced_search, doc_to_dict
     from intent import should_use_rag
-    from llm import LLMConfigError, LLMRefusalError, generate_answer
+    from llm import LLMConfigError, LLMRefusalError, generate_answer, select_concepts
+    from knowledge import Concept, load_concepts
+    from config import KNOWLEDGE_DIR, MAX_CONCEPTS
 
 logger = logging.getLogger("rag_api")
 logging.basicConfig(level=logging.INFO)
@@ -64,6 +68,23 @@ if HAS_FASTAPI:
     class AnswerRequest(BaseModel):
         query: str = Field(..., description="User question")
         top_k: int = Field(5, ge=1, le=50, description="Number of context passages sent to the LLM")
+        use_knowledge: bool = Field(True, description="Route through curated OKF concepts before RAG")
+
+    def route_concepts(query: str, use_knowledge: bool) -> tuple[list[Concept], dict[str, Any]]:
+        concepts = load_concepts(KNOWLEDGE_DIR) if use_knowledge else []
+        if not concepts:
+            return [], {"enabled": False, "selected": [], "error": None}
+        try:
+            selected = select_concepts(query, concepts, MAX_CONCEPTS)
+        except LLMConfigError:
+            raise
+        except Exception as exc:
+            logger.warning("[ROUTER] Concept selection failed, answering from RAG only: %s", exc)
+            return [], {"enabled": True, "selected": [], "error": str(exc)}
+        return selected, {"enabled": True, "selected": [c.path for c in selected], "error": None}
+
+    def concept_to_dict(concept: Concept) -> dict[str, Any]:
+        return {"path": concept.path, "title": concept.title, "verified_tier": concept.verified_tier}
 
     @app.get("/api/v1/health")
     def health():
@@ -111,14 +132,17 @@ if HAS_FASTAPI:
     @app.post("/api/v1/answer")
     def answer_rag(payload: AnswerRequest):
         try:
+            concepts, router = route_concepts(payload.query, payload.use_knowledge)
             docs = [doc_to_dict(d) for d in advanced_search(payload.query, top_k=payload.top_k)]
-            answer = generate_answer(payload.query, docs)
+            answer = generate_answer(payload.query, docs, concepts)
             return {
                 "answer": answer.text,
                 "provider": answer.provider,
                 "model": answer.model,
                 "count": len(docs),
                 "sources": docs,
+                "concepts": [concept_to_dict(c) for c in concepts],
+                "router": router,
             }
         except LLMConfigError as exc:
             logger.error("[API] LLM misconfigured: %s", exc)
